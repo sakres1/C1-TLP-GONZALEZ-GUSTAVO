@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Events</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-50 text-gray-800 font-sans" onload="iniciarApp()">
+    <nav
+      class="bg-white shadow px-8 py-4 flex justify-between items-center mb-8"
+    >
+      <div class="font-bold text-2xl text-orange-600">Smart Events</div>
+      <div class="space-x-4">
+        <button
+          onclick="cambiarVista('publica')"
+          class="hover:text-orange-600 font-medium"
+        >
+          Eventos
+        </button>
+        <button
+          onclick="cambiarVista('admin')"
+          class="hover:text-orange-600 font-medium"
+        >
+          Panel Admin
+        </button>
+      </div>
+    </nav>
+
+    <main id="vista-publica" class="max-w-6xl mx-auto px-4 pb-12">
+      <h1 class="text-3xl font-bold mb-6">Próximos Eventos</h1>
+      <div
+        id="contenedor-eventos"
+        class="grid grid-cols-1 md:grid-cols-3 gap-6"
+      ></div>
+    </main>
+
+    <div
+      id="modal-inscripcion"
+      class="fixed inset-0 bg-black/50 hidden flex justify-center items-center z-50"
+    >
+      <div class="bg-white p-6 rounded-xl w-full max-w-sm">
+        <h2 class="text-xl font-bold mb-4">Inscripción</h2>
+        <form onsubmit="guardarInscripcion(event)">
+          <input type="hidden" id="modal-id-evento" />
+          <input
+            type="text"
+            id="nombre-usuario"
+            placeholder="Tu Nombre"
+            required
+            class="w-full mb-3 p-2 border rounded"
+          />
+          <input
+            type="email"
+            id="correo-usuario"
+            placeholder="Tu Correo"
+            required
+            class="w-full mb-4 p-2 border rounded"
+          />
+          <div class="flex justify-end space-x-2">
+            <button
+              type="button"
+              onclick="cerrarModal()"
+              class="px-4 py-2 text-gray-500"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 bg-orange-600 text-white rounded"
+            >
+              Registrarme
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <main
+      id="vista-admin"
+      class="max-w-6xl mx-auto px-4 grid md:grid-cols-3 gap-8 hidden"
+    >
+      <div class="bg-white p-6 rounded-xl shadow-sm border">
+        <h2 class="font-bold text-lg mb-4">Crear Evento</h2>
+        <form onsubmit="guardarEvento(event)" class="space-y-3">
+          <input
+            type="text"
+            id="nuevo-titulo"
+            placeholder="Título"
+            required
+            class="w-full p-2 border rounded"
+          />
+          <input
+            type="datetime-local"
+            id="nueva-fecha"
+            required
+            class="w-full p-2 border rounded"
+          />
+          <input
+            type="text"
+            id="nuevo-lugar"
+            placeholder="Lugar"
+            required
+            class="w-full p-2 border rounded"
+          />
+          <input
+            type="url"
+            id="nueva-imagen"
+            placeholder="URL Imagen"
+            required
+            class="w-full p-2 border rounded"
+          />
+          <input
+            type="number"
+            id="nuevo-precio"
+            placeholder="Precio (0 = Gratis)"
+            value="0"
+            class="w-full p-2 border rounded"
+          />
+          <button type="submit" class="w-full bg-black text-white p-2 rounded">
+            Publicar
+          </button>
+        </form>
+      </div>
+
+      <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border">
+        <h2 class="font-bold text-lg mb-4">Ver Inscritos</h2>
+        <select
+          id="selector-admin"
+          onchange="mostrarTablaAdmin()"
+          class="w-full mb-4 p-2 border rounded"
+        ></select>
+
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-gray-100">
+              <th class="p-2">Nombre</th>
+              <th class="p-2">Correo</th>
+              <th class="p-2">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-admin"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <script>
+      // 1. funciones
+      // Lee datos guardados, si no hay devuelve un arreglo vacio
+      const obtenerDatos = (clave) =>
+        JSON.parse(localStorage.getItem(clave)) || [];
+      // Guarda datos actualizados en el navegador
+      const guardarDatos = (clave, datos) =>
+        localStorage.setItem(clave, JSON.stringify(datos));
+
+      // Inicia la app y crea eventos de prueba si esta vacio
+      function iniciarApp() {
+        if (obtenerDatos("eventos").length === 0) {
+          guardarDatos("eventos", [
+            {
+              id: 1,
+              titulo: "Evento de Prueba",
+              fecha: "2026-06-01T10:00",
+              lugar: "Peru",
+              imagen:
+                "https://growbed.decorexpro.com/wp-content/uploads/2018/07/ogurcy-kornishony.jpg",
+              precio: 0,
+            },
+          ]);
+        }
+        mostrarEventos();
+      }
+
+      // 2. Navegacion
+      // Alterna entre la vista publica y admi
+      function cambiarVista(nombreVista) {
+        document
+          .getElementById("vista-publica")
+          .classList.toggle("hidden", nombreVista !== "publica");
+        document
+          .getElementById("vista-admin")
+          .classList.toggle("hidden", nombreVista !== "admin");
+
+        if (nombreVista === "publica") mostrarEventos();
+        if (nombreVista === "admin") actualizarSelectorAdmin();
+      }
+
+      //3. Mostrar los Eventos
+      function mostrarEventos() {
+        const eventos = obtenerDatos("eventos");
+        const inscripciones = obtenerDatos("inscripciones");
+        const contenedor = document.getElementById("contenedor-eventos");
+        contenedor.innerHTML = "";
+
+        eventos.forEach((evento) => {
+          // Cuenta cuantas inscripciones hacen match con el ID del eventoski
+          const cantidadInscritos = inscripciones.filter(
+            (inscripcion) => inscripcion.idEvento === evento.id,
+          ).length;
+          const textoPrecio =
+            evento.precio == 0 ? "Gratis" : `$${evento.precio}`;
+
+          
+          contenedor.innerHTML += `
+          <div class="bg-white rounded-xl shadow border overflow-hidden">
+            <img src="${evento.imagen}" class="w-full h-40 object-cover">
+            <div class="p-4">
+              <h3 class="font-bold text-lg">${evento.titulo}</h3>
+              <p class="text-sm text-gray-500"> ${evento.fecha.replace("T", " ")} |  ${evento.lugar}</p>
+              <p class="text-sm text-orange-600 font-bold mt-1">${textoPrecio} •  ${cantidadInscritos} inscritos</p>
+              <button onclick="abrirModal(${evento.id})" class="mt-4 w-full bg-gray-900 text-white py-2 rounded">Inscribirse</button>
+            </div>
+          </div>
+        `;
+        });
+      }
+
+      // 4. inscripcion
+      function abrirModal(id) {
+        document.getElementById("modal-id-evento").value = id;
+        document.getElementById("modal-inscripcion").classList.remove("hidden");
+      }
+
+      function cerrarModal() {
+        document.getElementById("modal-inscripcion").classList.add("hidden");
+      }
+
+      function guardarInscripcion(e) {
+        e.preventDefault(); // Evita que la pagina recargue
+
+        const nuevaInscripcion = {
+          id: Date.now(), // ID unico basado en la fecha actual
+          idEvento: parseInt(document.getElementById("modal-id-evento").value),
+          nombre: document.getElementById("nombre-usuario").value,
+          correo: document.getElementById("correo-usuario").value,
+        };
+
+        const inscripciones = obtenerDatos("inscripciones");
+        inscripciones.push(nuevaInscripcion); // Añade el nuevo registro
+        guardarDatos("inscripciones", inscripciones); // Guarda en LocalStorage
+
+        alert("Inscrito correctamente");
+        e.target.reset(); // Limpia el formulario
+        cerrarModal();
+        mostrarEventos(); // Actualiza los contadores visuales
+      }
+
+      // 5.crear eventos y ver inscritos
+      function guardarEvento(e) {
+        e.preventDefault();
+
+        const nuevoEvento = {
+          id: Date.now(),
+          titulo: document.getElementById("nuevo-titulo").value,
+          fecha: document.getElementById("nueva-fecha").value,
+          lugar: document.getElementById("nuevo-lugar").value,
+          imagen: document.getElementById("nueva-imagen").value,
+          precio: parseFloat(document.getElementById("nuevo-precio").value),
+        };
+
+        const eventos = obtenerDatos("eventos");
+        eventos.push(nuevoEvento);
+        guardarDatos("eventos", eventos);
+
+        alert("Evento publicado");
+        e.target.reset();
+        actualizarSelectorAdmin(); // Actualiza el selector de la tabla admin
+      }
+
+      // Llena el select del admin con los eventos
+      function actualizarSelectorAdmin() {
+        const eventos = obtenerDatos("eventos");
+        const selector = document.getElementById("selector-admin");
+        selector.innerHTML =
+          '<option value="">-- Selecciona un evento --</option>';
+        eventos.forEach(
+          (evento) =>
+            (selector.innerHTML += `<option value="${evento.id}">${evento.titulo}</option>`),
+        );
+        mostrarTablaAdmin(); // muesta la tabla vacia o con datos
+      }
+
+      // muestra la tabla de personas inscritas segun el evento seleccionado
+      function mostrarTablaAdmin() {
+        const idEvento = parseInt(
+          document.getElementById("selector-admin").value,
+        );
+        const inscripciones = obtenerDatos("inscripciones").filter(
+          (inscripcion) => inscripcion.idEvento === idEvento,
+        );
+        const tabla = document.getElementById("tabla-admin");
+        tabla.innerHTML = "";
+
+        if (!idEvento || inscripciones.length === 0) {
+          tabla.innerHTML =
+            '<tr><td colspan="3" class="p-2 text-center text-gray-500">Sin inscritos.</td></tr>';
+          return;
+        }
+
+        inscripciones.forEach((inscripcion) => {
+          tabla.innerHTML += `
+          <tr class="border-b">
+            <td class="p-2">${inscripcion.nombre}</td>
+            <td class="p-2">${inscripcion.correo}</td>
+            <td class="p-2 text-red-500 cursor-pointer" onclick="borrarInscripcion(${inscripcion.id})">Borrar</td>
+          </tr>
+        `;
+        });
+      }
+
+      // elimina una inscripcion y actualiza la tabla
+      function borrarInscripcion(id) {
+        if (confirm("Borrar inscripcion?")) {
+          const inscripcionesFiltradas = obtenerDatos("inscripciones").filter(
+            (inscripcion) => inscripcion.id !== id,
+          );
+          guardarDatos("inscripciones", inscripcionesFiltradas);
+          mostrarTablaAdmin(); // Reinicia la tabla
+        }
+      }
+    </script>
+  </body>
+</html>
